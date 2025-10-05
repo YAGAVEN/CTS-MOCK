@@ -1,0 +1,33 @@
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+venv/
+.env
+
+# Logs and outputs
+*.log
+runs/*/*.ckpt
+runs/*/*.pth
+runs/*/events.out.tfevents*
+*.npy
+*.npz
+
+# Data files
+data/
+*.wav
+*.mp3
+migrations/
+uploads/
+cache/
+tokenizer/
+models/
+
+# Jupyter/VSCode
+.ipynb_checkpoints
+.vscode/
+.DS_Store
+
+# Environment files
+.env
