@@ -14,6 +14,7 @@ import IrisScan from "./pages/IrisScan";
 import TextInput from "./pages/TextInput";
 import VoiceInput from "./pages/VoiceInput";
 import Result from "./pages/Result";
+import Output from "./pages/Output"; 
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/text-input" element={<TextInput />} />
               <Route path="/voice-input" element={<VoiceInput />} />
               <Route path="/result" element={<Result />} />
+              <Route path="/output" element={<Output />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </PredictionProvider>

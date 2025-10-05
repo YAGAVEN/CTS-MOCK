@@ -4,44 +4,64 @@ import { usePrediction } from '@/contexts/PredictionContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Eye, Camera } from 'lucide-react';
+import { Upload, Image as ImageIcon } from 'lucide-react';
 
-const IrisScan = () => {
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanned, setScanned] = useState(false);
+const IrisUpload = () => {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
   const { selectedFeatures, completedFeatures, addCompletedFeature, updatePredictionData } = usePrediction();
   const navigate = useNavigate();
 
-  const handleScan = () => {
-    setIsScanning(true);
-    
-    setTimeout(() => {
-      setIsScanning(false);
-      setScanned(true);
-      toast.success('Iris scan completed!');
-    }, 3000);
-  };
-
-  const handleContinue = () => {
-    updatePredictionData('irisData', 'iris-scan-complete');
-    addCompletedFeature('iris');
-
-    const nextFeature = selectedFeatures.find(
-      f => !completedFeatures.includes(f) && f !== 'iris'
-    );
-
-    if (nextFeature) {
-      const routes: Record<string, string> = {
-        psychological: '/psychological',
-        image: '/image-upload',
-        text: '/text-input',
-        voice: '/voice-input',
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
       };
-      navigate(routes[nextFeature]);
-    } else {
-      navigate('/result');
+      reader.readAsDataURL(selectedFile);
     }
   };
+
+  const handleSubmit = async () => {
+  if (!file) {
+    toast.error('Please select an image');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('http://127.0.0.1:8000/predict-iris', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (response.ok && (data.label || data.predicted_bin)) {
+      // Normalize key for storing iris prediction
+      updatePredictionData('irisData', data);
+      addCompletedFeature('iris');
+      toast.success(`Predicted Age Group: ${data.label ?? data.predicted_bin}`);
+
+      // Directly navigate to results page after iris prediction
+      navigate('/result');
+    } else {
+      toast.error(data.error || 'Prediction failed');
+    }
+  } catch (error) {
+    toast.error('Server error. Please try again.');
+    console.error(error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/30 to-background p-4 animate-fade-in">
@@ -49,48 +69,47 @@ const IrisScan = () => {
         <Card className="shadow-xl border-border/50 animate-slide-in">
           <CardHeader>
             <CardTitle className="text-2xl text-center flex items-center justify-center gap-2">
-              <Eye className="w-6 h-6 text-primary" />
-              Iris Scan
+              <ImageIcon className="w-6 h-6 text-primary" />
+              Upload Your Image
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="relative aspect-video bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg flex items-center justify-center overflow-hidden">
-              {isScanning ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-64 h-64 border-4 border-primary rounded-full animate-pulse" />
-                  <Eye className="absolute w-32 h-32 text-primary animate-pulse" />
-                </div>
-              ) : scanned ? (
-                <div className="text-center space-y-4">
-                  <Eye className="w-32 h-32 mx-auto text-primary" />
-                  <p className="text-lg font-medium text-primary">Scan Complete!</p>
-                </div>
-              ) : (
-                <div className="text-center space-y-4">
-                  <Camera className="w-32 h-32 mx-auto text-muted-foreground" />
-                  <p className="text-muted-foreground">Position your eye in front of the camera</p>
-                </div>
-              )}
+            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+                id="image-upload"
+                disabled={loading}
+              />
+              <label htmlFor="image-upload" className="cursor-pointer">
+                {preview ? (
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    className="max-w-full max-h-64 mx-auto rounded-lg"
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    <Upload className="w-16 h-16 mx-auto text-muted-foreground" />
+                    <div>
+                      <p className="text-lg font-medium">Click to upload image</p>
+                      <p className="text-sm text-muted-foreground">PNG, JPG up to 10MB</p>
+                    </div>
+                  </div>
+                )}
+              </label>
             </div>
 
-            {!scanned ? (
-              <Button
-                onClick={handleScan}
-                className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
-                size="lg"
-                disabled={isScanning}
-              >
-                {isScanning ? 'Scanning...' : 'Start Scan'}
-              </Button>
-            ) : (
-              <Button
-                onClick={handleContinue}
-                className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
-                size="lg"
-              >
-                Continue
-              </Button>
-            )}
+            <Button
+              onClick={handleSubmit}
+              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+              size="lg"
+              disabled={loading}
+            >
+              {loading ? 'Uploading...' : 'Continue'}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -98,4 +117,4 @@ const IrisScan = () => {
   );
 };
 
-export default IrisScan;
+export default IrisUpload;
