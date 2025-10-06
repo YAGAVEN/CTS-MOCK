@@ -15,7 +15,6 @@ import os
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image as tf_image
 from transformers import BertTokenizer, BertForSequenceClassification
-from sentence_transformers import SentenceTransformer
 
 # ============================================================
 # INITIALIZE APP AND CORS
@@ -174,40 +173,21 @@ async def predict_iris(file: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-# app_text_only.py
-# ==========================
-# LOAD MODELS
-# ==========================
-TEXT_MODEL_SENTENCE_PATH = "models/sentence_model"
-TEXT_MODEL_CLASSIFIER_PATH = "models/classifier_st.pkl"
-TEXT_MODEL_ENCODER_PATH = "models/label_encoder_st.pkl"
-
-embedder = SentenceTransformer(TEXT_MODEL_SENTENCE_PATH)  # SentenceTransformer model folder
-clf = joblib.load(TEXT_MODEL_CLASSIFIER_PATH)              # Logistic Regression classifier
-label_encoder = joblib.load(TEXT_MODEL_ENCODER_PATH)       # Age group label encoder
-
-# ==========================
-# PREDICT TEXT ENDPOINT
-# ==========================
-@app.post("/predict-text1")
-def predict_text(req: PredictTextRequest):
+@app.get("/predict-iris/{folder}/{filename}")
+async def predict_iris_from_path(folder: str = Path(...), filename: str = Path(...)):
     try:
-        # 1️⃣ Convert input text to embedding
-        user_embedding = embedder.encode([req.text], convert_to_tensor=False)
-
-        # 2️⃣ Predict numeric label
-        predicted_label = clf.predict(user_embedding)
-
-        # 3️⃣ Predict probabilities to get confidence
-        probs = clf.predict_proba(user_embedding)
-        confidence = float(np.max(probs))
-
-        # 4️⃣ Convert numeric label back to age group
-        predicted_age_group = label_encoder.inverse_transform(predicted_label)
-
-        return {
-            "label": predicted_age_group[0],
+        file_path = os.path.join(folder, filename)
+        if not os.path.exists(file_path):
+            return JSONResponse({"error": f"File {file_path} not found"}, status_code=404)
+        img = Image.open(file_path).convert("RGB")
+        img_array = iris_preprocess(img)
+        preds = iris_model.predict(img_array)
+        class_idx = int(np.argmax(preds[0]))
+        confidence = float(np.max(preds[0]))
+        age_range = iris_age_bins[class_idx]
+        return JSONResponse({
+            "label": f"{age_range[0]}-{age_range[1]}",
             "confidence": round(confidence, 2)
-        }
+        })
     except Exception as e:
-        return {"error": str(e)}
+        return JSONResponse({"error": str(e)}, status_code=500)
